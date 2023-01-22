@@ -1,6 +1,6 @@
 [package]
 name = "one-euro"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Rostyslav Bohomaz <rostyslav.db@gmail.com>"]
 license = "MIT"
