@@ -2,7 +2,7 @@ use std::ops::{AddAssign, Neg};
 
 use nalgebra::{SVector, RealField};
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct LowPassFilter<T: RealField, const D: usize>
 {
     state: Option<SVector<T, D>>,

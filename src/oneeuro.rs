@@ -2,7 +2,7 @@ use nalgebra::{SVector, RealField};
 
 use crate::LowPassFilter;
 
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct OneEuroFilter<T: RealField, const D: usize> {
     rate: T,
     cutoff_slope: T,
