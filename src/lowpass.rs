@@ -1,35 +1,32 @@
-use std::ops::AddAssign;
+use std::ops::{AddAssign, Neg};
 
-use nalgebra::allocator::Allocator;
-use nalgebra::{DefaultAllocator, DimName, OVector, RealField};
+use nalgebra::{SVector, RealField};
 
 #[derive(Debug)]
-pub struct LowPassFilter<T, D>
-where
-    T: RealField,
-    D: DimName,
-    DefaultAllocator: Allocator<T, D>
+pub struct LowPassFilter<T: RealField, const D: usize>
 {
-    state: Option<OVector<T, D>>,
+    state: Option<SVector<T, D>>,
 }
 
-impl<T, D> LowPassFilter<T, D>
-where
-    T: RealField,
-    D: DimName,
-    DefaultAllocator: Allocator<T, D>
-{
-    pub fn new(sample: OVector<T, D>) -> Self {
+impl<T: RealField, const D: usize> LowPassFilter<T, D> {
+    pub fn new(sample: SVector<T, D>) -> Self {
         Self { state: Some(sample) }
     }
 
-    pub fn filter(&mut self, sample: &OVector<T, D>, alpha: OVector<T, D>) -> OVector<T, D> {
-        let mut output = sample.clone();
-        self.filter_mut(&mut output, alpha);
+    pub fn filter(&mut self, sample: &SVector<T, D>, alpha: SVector<T, D>) -> SVector<T, D> {
+        let output = match &self.state {
+            Some(value) => {
+                // current_sample * alpha + (1 - alpha) * previous_sample
+                sample.component_mul(&alpha) + value.component_mul(&alpha.neg().add_scalar(T::one()))
+            },
+            None => sample.to_owned(),
+        };
+
+        self.state = Some(output.to_owned());
         output
     }
 
-    pub fn filter_mut(&mut self, sample: &mut OVector<T, D>, mut alpha: OVector<T, D>) {
+    pub fn filter_mut(&mut self, sample: &mut SVector<T, D>, mut alpha: SVector<T, D>) {
         if let Some(value) = &self.state {
             // current_sample * alpha + (1 - alpha) * previous_sample
             sample.component_mul_assign(&alpha);
@@ -40,10 +37,10 @@ where
             sample.add_assign(value.component_mul(&alpha));
         };
 
-        self.state = Some(sample.clone());
+        self.state = Some(sample.to_owned());
     }
 
-    pub fn get_state(&self) -> Option<&OVector<T, D>> {
+    pub fn get_state(&self) -> Option<&SVector<T, D>> {
         self.state.as_ref()
     }
 
@@ -52,12 +49,7 @@ where
     }
 }
 
-impl<T, D> Default for LowPassFilter<T, D>
-where
-    T: RealField,
-    D: DimName,
-    DefaultAllocator: Allocator<T, D>
-{
+impl<T: RealField, const D: usize> Default for LowPassFilter<T, D> {
     fn default() -> Self {
         Self { state: None }
     }
@@ -65,14 +57,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use nalgebra::U1;
     use nalgebra::Vector1;
 
     use super::*;
 
     #[test]
     fn update_state_and_reset_on_default() {
-        let mut filter = LowPassFilter::<f64, U1>::default();
+        let mut filter = LowPassFilter::<f64, 1>::default();
         assert_eq!(filter.state, None);
         assert_eq!(filter.get_state(), None);
 

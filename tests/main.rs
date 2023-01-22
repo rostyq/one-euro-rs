@@ -6,7 +6,7 @@ mod tests {
 
     use std::{fs::File, time::Duration, fmt::Debug};
 
-    use nalgebra::{Point2, U2};
+    use nalgebra::Point2;
     use one_euro::OneEuroFilter;
     use serde::Deserialize;
 
@@ -50,7 +50,7 @@ mod tests {
             .expect("Cannot open file for signal data.");
 
         let mut reader = csv::Reader::from_reader(file);
-        let mut filter = OneEuroFilter::<f64, U2>::builder()
+        let mut filter = OneEuroFilter::<f64, 2>::builder()
             .with_rate(60.0)
             .with_cutoff_slope(0.007)
             .with_min_cutoff(1.0)
