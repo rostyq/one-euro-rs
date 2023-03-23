@@ -1,150 +1,146 @@
-use nalgebra::{SVector, RealField};
+use nalgebra::{RealField, SVector};
 
-use crate::LowPassFilter;
+use crate::lowpass::LowPassFilter;
 
 #[derive(Clone, Copy, Debug)]
 pub struct OneEuroFilter<T: RealField, const D: usize> {
-    rate: T,
-    cutoff_slope: T,
-    min_cutoff: SVector<T, D>,
-    derivate_cutoff: SVector<T, D>,
+    raw_state: SVector<T, D>,
     sample_filter: LowPassFilter<T, D>,
     derivate_filter: LowPassFilter<T, D>,
-    state: Option<SVector<T, D>>,
 }
 
 impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
-    pub fn new(rate: T, cutoff_slope: T, min_cutoff: SVector<T, D>, derivate_cutoff: SVector<T, D>) -> Self {
-        assert!(rate > T::zero());
-
-        for value in &min_cutoff {
-            assert!(*value > T::zero());
-        }
-
-        for value in &derivate_cutoff {
-            assert!(*value > T::zero());
-        }
-
+    pub fn new(state: SVector<T, D>) -> Self {
         Self {
-            rate,
-            cutoff_slope,
-            min_cutoff,
-            derivate_cutoff,
-            sample_filter: LowPassFilter::<T, D>::default(),
-            derivate_filter: LowPassFilter::<T, D>::default(),
-            state: None,
+            raw_state: state.to_owned(),
+            sample_filter: LowPassFilter::new(state.to_owned()),
+            derivate_filter: LowPassFilter::new(SVector::zeros()),
         }
     }
 
-    pub fn builder() -> OneEuroFilterBuilder<T, D> {
-        OneEuroFilterBuilder::<T, D>::default()
+    #[inline]
+    fn update_derivate(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>, scale: T) {
+        self.derivate_filter
+            .update(&(sample - &self.raw_state).scale(scale), alpha);
     }
 
-    pub fn get_rate(&self) -> T {
-        self.rate.to_owned()
+    #[inline]
+    fn update_sample(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>) {
+        self.sample_filter.update(sample, alpha);
     }
 
-    pub fn set_rate(&mut self, value: T) {
-        assert!(value > T::zero());
-        self.rate = value;
+    #[inline]
+    fn derivate(&self) -> &SVector<T, D> {
+        &self.derivate_filter.state
     }
 
-    pub fn set_cutoff_slope(&mut self, value: T) {
-        assert!(value > T::zero());
-        self.cutoff_slope = value;
+    #[inline]
+    fn get_frequency_cutoff(&self, intercept: T, slope: T) -> SVector<T, D> {
+        self.derivate().abs().scale(slope).add_scalar(intercept)
     }
 
-    pub fn get_cutoff_slope(&self) -> T {
-        self.cutoff_slope.to_owned()
+    #[inline]
+    pub fn update(
+        &mut self,
+        sample: &SVector<T, D>,
+        alpha: &SVector<T, D>,
+        rate: T,
+        mincutoff: T,
+        beta: T,
+    ) {
+        self.update_derivate(sample, alpha, rate.to_owned());
+        let alpha = self
+            .get_frequency_cutoff(mincutoff, beta)
+            .map(|v| Self::get_alpha(rate.to_owned(), v));
+        self.update_sample(sample, &alpha);
+        self.raw_state = sample.to_owned();
     }
 
-    pub fn filter(&mut self, sample: &SVector<T, D>) -> SVector<T, D> {
-        let mut output = sample.clone();
-        self.filter_mut(&mut output);
-        output
+    #[inline]
+    pub fn update_with_config(&mut self, sample: &SVector<T, D>, config: &OneEuroConfig<T, D>) {
+        self.update(
+            sample,
+            &config.alpha,
+            config.rate(),
+            config.mincutoff(),
+            config.beta(),
+        );
     }
 
-    pub fn filter_mut(&mut self, sample: &mut SVector<T, D>) {
-        let mut derivate = match self.state.as_ref() {
-            Some(value) => (sample.to_owned() - value).scale(self.rate.to_owned()),
-            None => SVector::<T, D>::zeros()
-        };
-
-        self.derivate_filter.filter_mut(&mut derivate, self.alpha(&self.derivate_cutoff));
-
-        let cutoff = self.min_cutoff.to_owned() + derivate.abs().scale(self.cutoff_slope.to_owned());
-
-        self.state = Some(sample.clone());
-
-        self.sample_filter.filter_mut(sample, self.alpha(&cutoff));
+    #[inline]
+    fn get_alpha(rate: T, cutoff: T) -> T {
+        T::one() / (T::one() + rate / (T::two_pi() * cutoff))
     }
 
-    fn alpha(&self, cutoff: &SVector<T, D>) -> SVector<T, D> {
-        let tau = cutoff.scale(T::two_pi());
-
-        let k = SVector::<T, D>::repeat(self.rate.to_owned())
-            .component_div(&tau);
-
-        SVector::<T, D>::repeat(T::one()).component_div(&k.add_scalar(T::one()))
+    #[inline]
+    pub fn state(&self) -> &SVector<T, D> {
+        &self.sample_filter.state
     }
 
-    pub fn get_state(&self) -> Option<&SVector<T, D>> {
-        self.state.as_ref()
+    #[inline]
+    pub fn raw_state(&self) -> &SVector<T, D> {
+        &self.raw_state
     }
 
-    pub fn reset(&mut self) {
-        self.state = None;
-        self.sample_filter.reset();
-        self.derivate_filter.reset();
+    #[inline]
+    pub fn derivative_state(&self) -> &SVector<T, D> {
+        &self.derivate_filter.state
     }
 }
 
 #[derive(Debug)]
-pub struct OneEuroFilterBuilder<T: RealField, const D: usize> {
-    rate: Option<T>,
-    cutoff_slope: Option<T>,
-    min_cutoff: Option<SVector<T, D>>,
-    derivate_cutoff: Option<SVector<T, D>>,
+pub struct OneEuroConfig<T: RealField, const D: usize> {
+    rate: T,
+    beta: T,
+    mincutoff: T,
+    alpha: SVector<T, D>,
 }
 
-impl<T: RealField, const D: usize> OneEuroFilterBuilder<T, D> {
-    pub fn build(self) -> OneEuroFilter<T, D> {
-        OneEuroFilter::new(
-            self.rate.unwrap_or(T::one()),
-            self.cutoff_slope.unwrap_or(T::zero()),
-            self.min_cutoff.unwrap_or(SVector::<T, D>::repeat(T::one())),
-            self.derivate_cutoff.unwrap_or(SVector::<T, D>::repeat(T::one())),
-        )
-    }
-
-    pub fn with_rate(mut self, value: T) -> Self {
-        self.rate = Some(value);
-        self
-    }
-
-    pub fn with_cutoff_slope(mut self, value: T) -> Self {
-        self.cutoff_slope = Some(value);
-        self
-    }
-
-    pub fn with_min_cutoff(mut self, value: T) -> Self {
-        self.min_cutoff = Some(SVector::<T, D>::repeat(value));
-        self
-    }
-
-    pub fn with_derivate_cutoff(mut self, value: T) -> Self {
-        self.derivate_cutoff = Some(SVector::<T, D>::repeat(value));
-        self
-    }
-}
-
-impl<T: RealField, const D: usize> Default for OneEuroFilterBuilder<T, D> {
-    fn default() -> Self {
+impl<T: RealField, const D: usize> OneEuroConfig<T, D> {
+    pub fn new(rate: T, mincutoff: T, beta: T) -> Self {
         Self {
-            rate: None,
-            cutoff_slope: None,
-            min_cutoff: None,
-            derivate_cutoff: None,
+            beta,
+            rate: rate.to_owned(),
+            mincutoff: mincutoff.to_owned(),
+            alpha: Self::get_alpha(rate.to_owned(), mincutoff.to_owned()),
         }
+    }
+
+    pub fn rate(&self) -> T {
+        self.rate.to_owned()
+    }
+
+    pub fn beta(&self) -> T {
+        self.beta.to_owned()
+    }
+
+    pub fn mincutoff(&self) -> T {
+        self.mincutoff.to_owned()
+    }
+
+    pub fn alpha(&self) -> &SVector<T, D> {
+        &self.alpha
+    }
+
+    pub fn set_rate(&mut self, value: T) {
+        assert!(
+            value > T::zero(),
+            "Sampling rate should be greater than zero."
+        );
+        self.rate = value;
+    }
+
+    pub fn set_mincutoff(&mut self, value: T) {
+        assert!(
+            value > T::zero(),
+            "Minimum frequency cutoff should be greater than zero."
+        );
+        self.mincutoff = value.to_owned();
+        self.alpha = Self::get_alpha(self.rate(), value.to_owned());
+    }
+
+    fn get_alpha(rate: T, cutoff: T) -> SVector<T, D> {
+        SVector::<T, D>::repeat(cutoff)
+            .map(|v| OneEuroFilter::<T, D>::get_alpha(rate.to_owned(), v))
     }
 }
