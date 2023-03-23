@@ -1,81 +1,71 @@
-use std::ops::{AddAssign, Neg};
+use std::ops::Neg;
 
-use nalgebra::{SVector, RealField};
+use nalgebra::{RealField, SVector};
 
+/// Low-pass filter state.
 #[derive(Clone, Copy, Debug)]
-pub struct LowPassFilter<T: RealField, const D: usize>
-{
-    state: Option<SVector<T, D>>,
+pub struct LowPassFilter<T: RealField, const D: usize> {
+    pub state: SVector<T, D>,
 }
 
 impl<T: RealField, const D: usize> LowPassFilter<T, D> {
-    pub fn new(sample: SVector<T, D>) -> Self {
-        Self { state: Some(sample) }
+    /// Initializes low-pass filter state.
+    pub fn new(state: SVector<T, D>) -> Self {
+        Self { state }
     }
 
-    pub fn filter(&mut self, sample: &SVector<T, D>, alpha: SVector<T, D>) -> SVector<T, D> {
-        let output = match &self.state {
-            Some(value) => {
-                // current_sample * alpha + (1 - alpha) * previous_sample
-                sample.component_mul(&alpha) + value.component_mul(&alpha.neg().add_scalar(T::one()))
-            },
-            None => sample.to_owned(),
-        };
-
-        self.state = Some(output.to_owned());
-        output
-    }
-
-    pub fn filter_mut(&mut self, sample: &mut SVector<T, D>, mut alpha: SVector<T, D>) {
-        if let Some(value) = &self.state {
-            // current_sample * alpha + (1 - alpha) * previous_sample
-            sample.component_mul_assign(&alpha);
-
-            alpha.neg_mut();
-            alpha.add_scalar_mut(T::one());
-
-            sample.add_assign(value.component_mul(&alpha));
-        };
-
-        self.state = Some(sample.to_owned());
-    }
-
-    pub fn get_state(&self) -> Option<&SVector<T, D>> {
-        self.state.as_ref()
-    }
-
-    pub fn reset(&mut self) {
-        self.state = None;
+    /// Updates with [`filter`] function using its state as `previous` value.
+    pub fn update(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>) {
+        self.state = filter(sample, &self.state, alpha);
     }
 }
 
-impl<T: RealField, const D: usize> Default for LowPassFilter<T, D> {
-    fn default() -> Self {
-        Self { state: None }
-    }
+/// Filter 1D signal as follows
+///
+///     current * alpha + (1 - alpha) * previous
+///
+/// where:
+///
+/// * `current` - Raw signal
+/// * `previous` - Previous signal
+/// * `alpha` - Smoothing factor
+#[inline]
+pub fn filter<T: RealField, const D: usize>(
+    current: &SVector<T, D>,
+    previous: &SVector<T, D>,
+    alpha: &SVector<T, D>,
+) -> SVector<T, D> {
+    current.component_mul(alpha) + previous.component_mul(&(alpha.neg().add_scalar(T::one())))
 }
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_abs_diff_eq;
     use nalgebra::Vector1;
 
     use super::*;
 
     #[test]
-    fn update_state_and_reset_on_default() {
-        let mut filter = LowPassFilter::<f64, 1>::default();
-        assert_eq!(filter.state, None);
-        assert_eq!(filter.get_state(), None);
+    fn test_lowpass_filter() {
+        let previous = Vector1::new(1.0);
+        let current = Vector1::new(2.0);
 
-        let sample = Vector1::new(1.0);
-        filter.filter(&sample, Vector1::new(0.0));
+        assert_abs_diff_eq!(filter(&current, &previous, &[0.0].into()), [1.0].into());
+        assert_abs_diff_eq!(filter(&current, &previous, &[1.0].into()), [2.0].into());
+        assert_abs_diff_eq!(filter(&current, &previous, &[0.5].into()), [1.5].into());
+    }
 
-        assert_eq!(filter.state.as_ref().unwrap(), &sample);
-        assert_eq!(filter.get_state().unwrap(), &sample);
+    #[test]
+    fn test_lowpass_filter_state() {
+        let mut filter = LowPassFilter::new(Vector1::new(1.0));
 
-        filter.reset();
+        filter.update(&[2.0].into(), &[0.0].into());
+        assert_abs_diff_eq!(filter.state, [1.0].into());
 
-        assert_eq!(filter.state, None);
-        assert_eq!(filter.get_state(), None);
+        filter.update(&[2.0].into(), &[1.0].into());
+        assert_abs_diff_eq!(filter.state, [2.0].into());
+
+        filter.update(&[3.0].into(), &[0.5].into());
+        assert_abs_diff_eq!(filter.state, [2.5].into());
     }
 }
