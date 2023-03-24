@@ -5,25 +5,24 @@ use nalgebra::{RealField, SVector};
 macro_rules! assert_alpha {
     ($alpha:ident, $T:ty) => {
         for value in $alpha.iter() {
-            assert!(*value >= T::zero());
-            assert!(*value <= T::one());
+            if *value < T::zero() || *value > T::one() {
+                panic!("`alpha` value should be in range [0, 1]");
+            }
         }
     };
 }
 
 /// Low-pass filter state.
 #[derive(Clone, Copy, Debug)]
-pub struct LowPassFilter<T: RealField, const D: usize> {
-    state: SVector<T, D>,
-}
+pub struct LowPassState<T: RealField, const D: usize> (SVector<T, D>);
 
-impl<T: RealField, const D: usize> LowPassFilter<T, D> {
+impl<T: RealField, const D: usize> LowPassState<T, D> {
     /// Initialize low-pass filter state.
     pub fn new(state: SVector<T, D>) -> Self {
-        Self { state }
+        Self(state)
     }
 
-    /// Filter new sample (see [`filter`] function) and set result as current state.
+    /// Update state using [`filter`] function.
     /// 
     /// # Arguments
     /// 
@@ -34,27 +33,33 @@ impl<T: RealField, const D: usize> LowPassFilter<T, D> {
     /// 
     /// See [`filter`].
     pub fn update(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>) {
-        self.state = filter(sample, &self.state, alpha);
+        self.0 = filter(sample, &self.0, alpha);
     }
 
-    /// Same as [`LowPassFilter::update`] but without alpha check.
+    /// Same as [`LowPassState::update`] but without alpha check.
     /// 
     /// # Safety
     /// 
     /// See [`filter_unchecked`].
     pub unsafe fn update_unchecked(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>) {
-        self.state = filter_unchecked(sample, &self.state, alpha);
+        self.0 = filter_unchecked(sample, &self.0, alpha);
     }
 
     /// Current state.
-    pub fn state(&self) -> &SVector<T, D> {
-        &self.state
+    pub fn data(&self) -> &SVector<T, D> {
+        &self.0
     }
 }
 
-impl<T: RealField, const D: usize> AsRef<SVector<T, D>> for LowPassFilter<T, D> {
+impl<T: RealField, const D: usize> AsRef<SVector<T, D>> for LowPassState<T, D> {
     fn as_ref(&self) -> &SVector<T, D> {
-        self.state()
+        self.data()
+    }
+}
+
+impl<T: RealField, const D: usize> From<SVector<T, D>> for LowPassState<T, D> {
+    fn from(value: SVector<T, D>) -> Self {
+        LowPassState::new(value)
     }
 }
 
@@ -113,16 +118,16 @@ mod tests {
     }
 
     #[test]
-    fn test_lowpass_filter_state() {
-        let mut filter = LowPassFilter::new(Vector1::new(1.0));
+    fn test_lowpass_state() {
+        let mut state = LowPassState::new(Vector1::new(1.0));
 
-        filter.update(&[2.0].into(), &[0.0].into());
-        assert_abs_diff_eq!(filter.state, [1.0].into());
+        state.update(&[2.0].into(), &[0.0].into());
+        assert_abs_diff_eq!(state.0, [1.0].into());
 
-        filter.update(&[2.0].into(), &[1.0].into());
-        assert_abs_diff_eq!(filter.state, [2.0].into());
+        state.update(&[2.0].into(), &[1.0].into());
+        assert_abs_diff_eq!(state.0, [2.0].into());
 
-        filter.update(&[3.0].into(), &[0.5].into());
-        assert_abs_diff_eq!(filter.state, [2.5].into());
+        state.update(&[3.0].into(), &[0.5].into());
+        assert_abs_diff_eq!(state.0, [2.5].into());
     }
 }
