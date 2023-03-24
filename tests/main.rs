@@ -7,7 +7,7 @@ mod tests {
     use std::{fs::File, time::Duration, fmt::Debug};
 
     use nalgebra::Point2;
-    use one_euro::OneEuroFilter;
+    use one_euro::{OneEuroState, OneEuroFilter};
     use serde::Deserialize;
 
     #[derive(Debug)]
@@ -50,28 +50,29 @@ mod tests {
             .expect("Cannot open file for signal data.");
 
         let mut reader = csv::Reader::from_reader(file);
-        let mut filter = OneEuroFilter::<f64, 2>::builder()
-            .with_rate(60.0)
-            .with_cutoff_slope(0.007)
-            .with_min_cutoff(1.0)
-            .with_derivate_cutoff(1.0)
-            .build();
+        let mut filter = OneEuroFilter::<f64, 2>::new(60.0, 1.0, 0.007);
 
-        let mut timestamp: Option<Duration> = None;
+        let mut records = reader.deserialize::<Record>();
 
-        for result in reader.deserialize() {
+        let (mut timestamp, mut state) = records.next().map(|r| {
+            let record: Record = r.expect("Error parsing test entry.");
+            let entry = Entry::from(record);
+            let state: OneEuroState<f64, 2> = entry.noisy.coords.into();
+            let timestamp = entry.timestamp;
+            (timestamp, state)
+        }).unwrap();
+
+        for result in records {
             let record: Record = result.expect("Error parsing test entry.");
             let entry = Entry::from(record);
 
-            if let Some(value) = timestamp {
-                filter.set_rate((entry.timestamp - value).as_secs_f64().recip());
-            }
+            filter.set_rate((entry.timestamp - timestamp).as_secs_f64().recip());
 
-            let filtered = filter.filter(&entry.noisy.coords);
+            filter.filter(&mut state, &entry.noisy.coords);
 
-            timestamp = Some(entry.timestamp);
+            timestamp = entry.timestamp;
 
-            assert_abs_diff_eq!(entry.filtered.coords, filtered, epsilon = 1e-6);
+            assert_abs_diff_eq!(entry.filtered.coords, state.data(), epsilon = 1e-6);
         }
     }
 }
