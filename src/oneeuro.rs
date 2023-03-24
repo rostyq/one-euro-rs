@@ -40,7 +40,7 @@ impl<T: RealField, const D: usize> OneEuroState<T, D> {
 
     /// Calculate frequency cutoff:
     /// 
-    ///     intercept + slope * derivate
+    /// `intercept + slope * derivate`
     /// 
     /// where `derivate` is value from [`derivate`].
     /// 
@@ -206,7 +206,7 @@ impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
 
 /// Calculate smoothing factor as follows
 /// 
-///     (1 + rate / (2 * π * cutoff)) ^ (-1)
+/// `(1 + rate / (2 * π * cutoff)) ^ (-1)`
 /// 
 /// # Arguments
 /// 

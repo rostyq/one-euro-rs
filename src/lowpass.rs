@@ -65,7 +65,7 @@ impl<T: RealField, const D: usize> From<SVector<T, D>> for LowPassState<T, D> {
 
 /// Filter signal as follows
 ///
-///     current * alpha + (1 - alpha) * previous
+/// `current * alpha + (1 - alpha) * previous`
 ///
 /// # Arguments
 ///
