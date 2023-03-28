@@ -2,16 +2,6 @@ use std::ops::Neg;
 
 use nalgebra::{RealField, SVector};
 
-macro_rules! assert_alpha {
-    ($alpha:ident, $T:ty) => {
-        for value in $alpha.iter() {
-            if *value < T::zero() || *value > T::one() {
-                panic!("`alpha` value should be in range [0, 1]");
-            }
-        }
-    };
-}
-
 /// Low-pass filter state.
 #[derive(Clone, Copy, Debug)]
 pub struct LowPassState<T: RealField, const D: usize> (SVector<T, D>);
@@ -75,14 +65,14 @@ impl<T: RealField, const D: usize> From<SVector<T, D>> for LowPassState<T, D> {
 /// 
 /// # Panics
 /// 
-/// This function will panic if any value in `alpha` is out of \[0, 1\] range.
+/// This function will panic if any value in `alpha` is out of \(0, 1\] range.
 #[inline]
 pub fn filter<T: RealField, const D: usize>(
     current: &SVector<T, D>,
     previous: &SVector<T, D>,
     alpha: &SVector<T, D>,
 ) -> SVector<T, D> {
-    assert_alpha!(alpha, T);
+    assert_alpha!(alpha);
     unsafe { filter_unchecked(current, previous, alpha) }
 }
 
@@ -90,7 +80,7 @@ pub fn filter<T: RealField, const D: usize>(
 /// 
 /// # Safety
 /// 
-/// Each value in `alpha` should be in \[0, 1\] range.
+/// Each value in `alpha` should be in \(0, 1\] range.
 #[inline]
 pub unsafe fn filter_unchecked<T: RealField, const D: usize>(
     current: &SVector<T, D>,
@@ -112,7 +102,6 @@ mod tests {
         let previous = Vector1::new(1.0);
         let current = Vector1::new(2.0);
 
-        assert_abs_diff_eq!(filter(&current, &previous, &[0.0].into()), [1.0].into());
         assert_abs_diff_eq!(filter(&current, &previous, &[1.0].into()), [2.0].into());
         assert_abs_diff_eq!(filter(&current, &previous, &[0.5].into()), [1.5].into());
     }
@@ -121,13 +110,28 @@ mod tests {
     fn test_lowpass_state() {
         let mut state = LowPassState::new(Vector1::new(1.0));
 
-        state.update(&[2.0].into(), &[0.0].into());
-        assert_abs_diff_eq!(state.0, [1.0].into());
-
         state.update(&[2.0].into(), &[1.0].into());
         assert_abs_diff_eq!(state.0, [2.0].into());
 
         state.update(&[3.0].into(), &[0.5].into());
         assert_abs_diff_eq!(state.0, [2.5].into());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_lowpass_alpha_negative() {
+        filter(&[0.0].into(), &[0.0].into(), &[-f64::EPSILON].into());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_lowpass_alpha_zero() {
+        filter(&[0.0].into(), &[0.0].into(), &[0.0].into());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_lowpass_alpha_greater_than_one() {
+        filter(&[0.0].into(), &[0.0].into(), &[1.0 + f64::EPSILON].into());
     }
 }
