@@ -50,7 +50,10 @@ mod tests {
             .expect("Cannot open file for signal data.");
 
         let mut reader = csv::Reader::from_reader(file);
-        let mut filter = OneEuroFilter::<f64, 2>::new(60.0, 1.0, 0.007);
+        let mut filter = OneEuroFilter::<f64, 2>::default();
+
+        filter.set_rate(60.0);
+        filter.set_beta(0.007);
 
         let mut records = reader.deserialize::<Record>();
 
