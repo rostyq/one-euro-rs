@@ -1,7 +1,11 @@
 pub extern crate nalgebra;
 
 #[macro_use]
-mod lowpass;
-mod oneeuro;
+mod alpha;
 
-pub use oneeuro::{OneEuroState, OneEuroFilter};
+mod lowpass;
+mod state;
+mod filter;
+
+pub use state::OneEuroState;
+pub use filter::OneEuroFilter;
