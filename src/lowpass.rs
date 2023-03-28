@@ -16,14 +16,14 @@ impl<T: RealField, const D: usize> LowPassState<T, D> {
     /// 
     /// # Arguments
     /// 
-    /// * `sample` - new signal
+    /// * `raw` - new unfiltered signal
     /// * `alpha` - smoothing factor
     /// 
     /// # Panics
     /// 
     /// See [`filter`].
-    pub fn update(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>) {
-        self.0 = filter(sample, &self.0, alpha);
+    pub fn update(&mut self, raw: &SVector<T, D>, alpha: &SVector<T, D>) {
+        self.0 = filter(raw, &self.0, alpha);
     }
 
     /// Same as [`LowPassState::update`] but without alpha check.
@@ -31,8 +31,8 @@ impl<T: RealField, const D: usize> LowPassState<T, D> {
     /// # Safety
     /// 
     /// See [`filter_unchecked`].
-    pub unsafe fn update_unchecked(&mut self, sample: &SVector<T, D>, alpha: &SVector<T, D>) {
-        self.0 = filter_unchecked(sample, &self.0, alpha);
+    pub unsafe fn update_unchecked(&mut self, raw: &SVector<T, D>, alpha: &SVector<T, D>) {
+        self.0 = filter_unchecked(raw, &self.0, alpha);
     }
 
     /// Current state.
@@ -98,16 +98,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_lowpass_filter() {
+    fn test_lowpass_filter_unit() {
         let previous = Vector1::new(1.0);
         let current = Vector1::new(2.0);
 
-        assert_abs_diff_eq!(filter(&current, &previous, &[1.0].into()), [2.0].into());
-        assert_abs_diff_eq!(filter(&current, &previous, &[0.5].into()), [1.5].into());
+        assert_abs_diff_eq!(filter(&current, &previous, &[1.0].into()), current);
     }
 
     #[test]
-    fn test_lowpass_state() {
+    fn test_lowpass_filter_half() {
+        let previous = Vector1::new(1.0);
+        let current = Vector1::new(2.0);
+        let alpha = Vector1::new(0.5);
+
+        assert_abs_diff_eq!(filter(&current, &previous, &alpha), previous.add_scalar(0.5));
+    }
+
+    #[test]
+    fn test_lowpass_filter_epsilon() {
+        let previous = Vector1::new(1.0);
+        let current = Vector1::new(2.0);
+        let alpha = Vector1::new(f64::EPSILON);
+
+        assert_abs_diff_eq!(filter(&current, &previous, &alpha), previous.add_scalar(f64::EPSILON));
+    }
+
+    #[test]
+    fn test_lowpass_state_update() {
         let mut state = LowPassState::new(Vector1::new(1.0));
 
         state.update(&[2.0].into(), &[1.0].into());
