@@ -14,57 +14,63 @@ pub struct OneEuroFilter<T: RealField, const D: usize> {
 }
 
 impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
+    /// Sampling frequency.
     pub fn rate(&self) -> T {
         self.rate.to_owned()
     }
 
+    /// Slope for frequency cutoff.
     pub fn beta(&self) -> T {
         self.beta.to_owned()
     }
 
+    /// Derivative frequency cutoff.
     pub fn dcutoff(&self) -> T {
         self.dcutoff.to_owned()
     }
 
+    /// Minimum value for frequency cutoff.
     pub fn mincutoff(&self) -> T {
         self.mincutoff.to_owned()
     }
 
+    /// Derivative smoothing factor.
     pub fn alpha(&self) -> &SVector<T, D> {
         &self.alpha
     }
 
+    /// Set sampling frequency.
     pub fn set_rate(&mut self, value: T) {
-        assert!(
-            value > T::zero(),
-            "Sampling rate should be greater than zero."
-        );
+        assert_positive!(value);
         self.rate = value;
         self.alpha = Self::get_alpha(self.rate(), self.mincutoff());
     }
 
-    pub fn set_cutoff(&mut self, value: T) {
-        assert!(
-            value >= T::zero(),
-            "Derivative cutoff should be positive or zero."
-        );
-        self.dcutoff = value.to_owned();
+    /// Set derivate frequency cutoff.
+    pub fn set_dcutoff(&mut self, value: T) {
+        assert_positive!(value);
+        self.dcutoff = value;
         self.alpha = Self::get_alpha(self.rate(), self.dcutoff());
     }
 
+    /// Set minimum value for frequency cutoff.
     pub fn set_mincutoff(&mut self, value: T) {
-        assert!(
-            value >= T::zero(),
-            "Minimal frequency cutoff should be positive or zero."
-        );
+        assert_positive!(value);
         self.mincutoff = value.to_owned();
     }
 
+    /// Set slope for frequency cutoff.
+    pub fn set_beta(&mut self, value: T) {
+        assert!(value >= T::zero(), "beta should be zero or positive.");
+        self.beta = value.to_owned();
+    }
+
+    /// Filter state using current parameters.
     #[inline]
-    pub fn filter(&self, state: &mut OneEuroState<T, D>, sample: &SVector<T, D>) {
+    pub fn filter(&self, state: &mut OneEuroState<T, D>, raw: &SVector<T, D>) {
         unsafe {
             state.update_unchecked(
-                sample,
+                raw,
                 self.alpha(),
                 self.rate(),
                 self.mincutoff(),
@@ -73,23 +79,19 @@ impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
         };
     }
 
-    pub fn set_beta(&mut self, value: T) {
-        assert!(value >= T::zero(), "beta should be positive or zero.");
-        self.beta = value.to_owned();
-    }
-
     fn get_alpha(rate: T, cutoff: T) -> SVector<T, D> {
         SVector::<T, D>::repeat(cutoff).map(|v| unsafe { get_alpha_unchecked(rate.to_owned(), v) })
     }
 }
 
 impl<T: RealField, const D: usize> Default for OneEuroFilter<T, D> {
+    /// Each setable parameter is 1.
     fn default() -> Self {
         Self {
             rate: T::one(),
             dcutoff: T::one(),
             mincutoff: T::one(),
-            beta: T::zero(),
+            beta: T::one(),
             alpha: Self::get_alpha(T::one(), T::one()),
         }
     }
