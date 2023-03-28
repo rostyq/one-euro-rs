@@ -39,7 +39,7 @@ impl<T: RealField, const D: usize> OneEuroState<T, D> {
         &self.raw
     }
 
-    /// Calculate derivate cutoff:
+    /// Calculate frequency cutoff:
     ///
     /// `intercept + slope * derivate`
     ///
@@ -61,16 +61,16 @@ impl<T: RealField, const D: usize> OneEuroState<T, D> {
     /// * `raw` - new unfiltered signal
     /// * `alpha` - smoothing factor for raw signal derivate
     /// * `rate` - signal sampling frequency
-    /// * `mincutoff` - minimal value for derivative cutoff
-    /// * `beta` - slope for derivative cutoff
+    /// * `mincutoff` - minimal value for frequency cutoff
+    /// * `beta` - slope for frequency cutoff
     ///
     /// # Panics
     ///
     /// This function panics if:
     ///
     /// * any value in `alpha` is not in \(0, 1\] range
-    /// * `rate` is negative or zero
-    /// * any value of `mincutoff` or `beta` is negative or zero
+    /// * `rate` or `mincutoff` are negative or zero
+    /// * `beta` is negative
     #[inline]
     pub fn update(
         &mut self,
@@ -100,27 +100,27 @@ impl<T: RealField, const D: usize> OneEuroState<T, D> {
     /// Calculation is valid if:
     ///
     /// * each value in `alpha` is in \(0, 1\] range
-    /// * `rate` is greater than zero
-    /// * each value of `mincutoff` or `beta` is positive or zero
+    /// * `rate` and `mincutoff` are positive
+    /// * `beta` is not negative
     #[inline]
     pub unsafe fn update_unchecked(
         &mut self,
-        sample: &SVector<T, D>,
+        raw: &SVector<T, D>,
         alpha: &SVector<T, D>,
         rate: T,
         mincutoff: T,
         beta: T,
     ) {
         self.derivate
-            .update_unchecked(&(sample - &self.raw).scale(rate.to_owned()), alpha);
+            .update_unchecked(&(raw - &self.raw).scale(rate.to_owned()), alpha);
 
         let alpha = self
             .get_cutoff(mincutoff, beta)
             .map(|v| get_alpha_unchecked(rate.to_owned(), v));
 
-        self.filtered.update_unchecked(sample, &alpha);
+        self.filtered.update_unchecked(raw, &alpha);
 
-        self.raw = sample.to_owned();
+        self.raw = raw.to_owned();
     }
 }
 
