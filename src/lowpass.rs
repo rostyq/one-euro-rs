@@ -22,6 +22,7 @@ impl<T: RealField, const D: usize> LowPassState<T, D> {
     /// # Panics
     /// 
     /// See [`filter`].
+    #[inline]
     pub fn update(&mut self, raw: &SVector<T, D>, alpha: &SVector<T, D>) {
         self.0 = filter(raw, &self.0, alpha);
     }
@@ -31,17 +32,20 @@ impl<T: RealField, const D: usize> LowPassState<T, D> {
     /// # Safety
     /// 
     /// See [`filter_unchecked`].
+    #[inline]
     pub unsafe fn update_unchecked(&mut self, raw: &SVector<T, D>, alpha: &SVector<T, D>) {
         self.0 = filter_unchecked(raw, &self.0, alpha);
     }
 
     /// Current state.
+    #[inline]
     pub fn data(&self) -> &SVector<T, D> {
         &self.0
     }
 }
 
 impl<T: RealField, const D: usize> AsRef<SVector<T, D>> for LowPassState<T, D> {
+    #[inline]
     fn as_ref(&self) -> &SVector<T, D> {
         self.data()
     }
