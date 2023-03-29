@@ -1,6 +1,6 @@
 [package]
 name = "one-euro"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Rostyslav Bohomaz <rostyslav.db@gmail.com>"]
 license = "MIT"
@@ -9,6 +9,7 @@ repository = "https://github.com/rostyq/one-euro-rs"
 exclude = [
     "/assets",
     "/tests",
+    "/benches",
     ".*"
 ]
 
