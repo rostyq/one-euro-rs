@@ -125,13 +125,27 @@ impl<T: RealField, const D: usize> OneEuroState<T, D> {
 }
 
 impl<T: RealField, const D: usize> AsRef<SVector<T, D>> for OneEuroState<T, D> {
+    #[inline]
     fn as_ref(&self) -> &SVector<T, D> {
         self.data()
+    }
+}
+
+impl<T: RealField, const D: usize> AsRef<[T; D]> for OneEuroState<T, D> {
+    #[inline]
+    fn as_ref(&self) -> &[T; D] {
+        &self.data().data.0[0]
     }
 }
 
 impl<T: RealField, const D: usize> From<SVector<T, D>> for OneEuroState<T, D> {
     fn from(value: SVector<T, D>) -> Self {
         Self::new(value)
+    }
+}
+
+impl<T: RealField, const D: usize> From<[T; D]> for OneEuroState<T, D> {
+    fn from(value: [T; D]) -> Self {
+        Self::new(value.into())
     }
 }
