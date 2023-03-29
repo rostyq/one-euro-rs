@@ -12,6 +12,10 @@ exclude = [
     ".*"
 ]
 
+[lib]
+name = "one_euro"
+bench = false
+
 [dependencies]
 nalgebra = { version = "0.32.1", default-features = false }
 
@@ -20,3 +24,8 @@ approx = { version = "0.5.1", default-features = false }
 csv = { version = "1.1.6", default-features = false }
 nalgebra = { version = "0.32.1", default-features = false, features = ["std"] }
 serde = { version = "1.0.152", features = ["derive"] }
+criterion = "0.4.0"
+
+[[bench]]
+name = "filter_bench"
+harness = false
