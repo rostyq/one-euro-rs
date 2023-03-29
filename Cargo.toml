@@ -9,7 +9,6 @@ repository = "https://github.com/rostyq/one-euro-rs"
 exclude = [
     "/assets",
     "/tests",
-    "/benches",
     ".*"
 ]
 
