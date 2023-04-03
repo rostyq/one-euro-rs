@@ -13,6 +13,7 @@ pub struct OneEuroState<T: RealField, const D: usize> {
 
 impl<T: RealField, const D: usize> OneEuroState<T, D> {
     /// Initializes 1€ Filter state.
+    #[inline]
     pub fn new(state: SVector<T, D>) -> Self {
         Self {
             raw: state.to_owned(),
@@ -139,12 +140,14 @@ impl<T: RealField, const D: usize> AsRef<[T; D]> for OneEuroState<T, D> {
 }
 
 impl<T: RealField, const D: usize> From<SVector<T, D>> for OneEuroState<T, D> {
+    #[inline]
     fn from(value: SVector<T, D>) -> Self {
         Self::new(value)
     }
 }
 
 impl<T: RealField, const D: usize> From<[T; D]> for OneEuroState<T, D> {
+    #[inline]
     fn from(value: [T; D]) -> Self {
         Self::new(value.into())
     }

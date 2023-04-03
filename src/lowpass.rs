@@ -8,6 +8,7 @@ pub struct LowPassState<T: RealField, const D: usize> (SVector<T, D>);
 
 impl<T: RealField, const D: usize> LowPassState<T, D> {
     /// Initialize low-pass filter state.
+    #[inline]
     pub fn new(state: SVector<T, D>) -> Self {
         Self(state)
     }
@@ -52,6 +53,7 @@ impl<T: RealField, const D: usize> AsRef<SVector<T, D>> for LowPassState<T, D> {
 }
 
 impl<T: RealField, const D: usize> From<SVector<T, D>> for LowPassState<T, D> {
+    #[inline]
     fn from(value: SVector<T, D>) -> Self {
         LowPassState::new(value)
     }

@@ -1,6 +1,6 @@
 [package]
 name = "one-euro"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["Rostyslav Bohomaz <rostyslav.db@gmail.com>"]
 license = "MIT"
@@ -29,3 +29,6 @@ criterion = "0.4.0"
 [[bench]]
 name = "filter_bench"
 harness = false
+
+[profile.bench]
+lto = true
