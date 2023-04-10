@@ -88,7 +88,7 @@ impl<T: RealField> OneEuroFilter<T> {
     }
 
     #[inline]
-    fn get_alpha<const D: usize>(&self, rate: T) -> SVector<T, D> {
+    pub fn get_alpha<const D: usize>(&self, rate: T) -> SVector<T, D> {
         SVector::<T, D>::repeat(unsafe { get_alpha_unchecked(rate, self.dcutoff()) })
     }
 }
