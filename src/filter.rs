@@ -1,25 +1,17 @@
 use nalgebra::{RealField, SVector};
 
-use crate::state::OneEuroState;
 use crate::alpha::get_alpha_unchecked;
+use crate::state::OneEuroState;
 
 /// 1€ Filter parameters.
-#[derive(Debug)]
-pub struct OneEuroFilter<T: RealField, const D: usize> {
-    rate: T,
+#[derive(Debug, Clone, Copy)]
+pub struct OneEuroFilter<T: RealField> {
     beta: T,
     dcutoff: T,
     mincutoff: T,
-    alpha: SVector<T, D>,
 }
 
-impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
-    /// Sampling frequency.
-    #[inline]
-    pub fn rate(&self) -> T {
-        self.rate.to_owned()
-    }
-
+impl<T: RealField> OneEuroFilter<T> {
     /// Slope for frequency cutoff.
     #[inline]
     pub fn beta(&self) -> T {
@@ -38,26 +30,11 @@ impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
         self.mincutoff.to_owned()
     }
 
-    /// Derivative smoothing factor.
-    #[inline]
-    pub fn alpha(&self) -> &SVector<T, D> {
-        &self.alpha
-    }
-
-    /// Set sampling frequency.
-    #[inline]
-    pub fn set_rate(&mut self, value: T) {
-        assert_positive!(value);
-        self.rate = value;
-        self.alpha = Self::get_alpha(self.rate(), self.mincutoff());
-    }
-
     /// Set derivate frequency cutoff.
     #[inline]
     pub fn set_dcutoff(&mut self, value: T) {
         assert_positive!(value);
         self.dcutoff = value;
-        self.alpha = Self::get_alpha(self.rate(), self.dcutoff());
     }
 
     /// Set minimum value for frequency cutoff.
@@ -76,34 +53,54 @@ impl<T: RealField, const D: usize> OneEuroFilter<T, D> {
 
     /// Filter state using current parameters.
     #[inline]
-    pub fn filter(&self, state: &mut OneEuroState<T, D>, raw: &SVector<T, D>) {
+    pub fn filter<const D: usize>(
+        &self,
+        state: &mut OneEuroState<T, D>,
+        raw: &SVector<T, D>,
+        rate: T,
+    ) {
         unsafe {
             state.update_unchecked(
                 raw,
-                self.alpha(),
-                self.rate(),
+                &self.get_alpha(rate.to_owned()),
+                rate,
                 self.mincutoff(),
                 self.beta(),
             )
         };
     }
 
+    /// Filter multiple states using current parameters.
     #[inline]
-    fn get_alpha(rate: T, cutoff: T) -> SVector<T, D> {
-        SVector::<T, D>::repeat(cutoff).map(|v| unsafe { get_alpha_unchecked(rate.to_owned(), v) })
+    pub fn filter_slice<const D: usize>(
+        &self,
+        states: &mut [OneEuroState<T, D>],
+        raws: &[SVector<T, D>],
+        rate: T,
+    ) {
+        let alpha = self.get_alpha::<D>(rate.to_owned());
+
+        for (state, raw) in states.iter_mut().zip(raws) {
+            unsafe {
+                state.update_unchecked(raw, &alpha, rate.to_owned(), self.mincutoff(), self.beta())
+            };
+        }
+    }
+
+    #[inline]
+    fn get_alpha<const D: usize>(&self, rate: T) -> SVector<T, D> {
+        SVector::<T, D>::repeat(unsafe { get_alpha_unchecked(rate, self.dcutoff()) })
     }
 }
 
-impl<T: RealField, const D: usize> Default for OneEuroFilter<T, D> {
+impl<T: RealField> Default for OneEuroFilter<T> {
     /// Each setable parameter is 1.
     #[inline]
     fn default() -> Self {
         Self {
-            rate: T::one(),
             dcutoff: T::one(),
             mincutoff: T::one(),
             beta: T::one(),
-            alpha: Self::get_alpha(T::one(), T::one()),
         }
     }
 }

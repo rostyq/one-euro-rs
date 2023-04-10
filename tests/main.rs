@@ -50,9 +50,8 @@ mod tests {
             .expect("Cannot open file for signal data.");
 
         let mut reader = csv::Reader::from_reader(file);
-        let mut filter = OneEuroFilter::<f64, 2>::default();
+        let mut filter = OneEuroFilter::<f64>::default();
 
-        filter.set_rate(60.0);
         filter.set_beta(0.007);
 
         let mut records = reader.deserialize::<Record>();
@@ -69,9 +68,9 @@ mod tests {
             let record: Record = result.expect("Error parsing test entry.");
             let entry = Entry::from(record);
 
-            filter.set_rate((entry.timestamp - timestamp).as_secs_f64().recip());
+            let rate = (entry.timestamp - timestamp).as_secs_f64().recip();
 
-            filter.filter(&mut state, &entry.noisy.coords);
+            filter.filter(&mut state, &entry.noisy.coords, rate);
 
             timestamp = entry.timestamp;
 
